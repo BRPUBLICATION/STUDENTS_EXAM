@@ -1,25 +1,25 @@
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
-const mysql = require('mysql2');
+const { MongoClient, ObjectId } = require('mongodb');
 const app = express();
 const PORT = 3000;
 
-// MySQL Connection
-const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'Krish@2005', // Use environment variables in production
-  database: 'exam_portal',
-});
+// MongoDB Connection
+const MONGODB_URI = 'mongodb+srv://krish1:krish123@cluster0.rxhaklh.mongodb.net/'; // Change this to your MongoDB URI
+const DATABASE_NAME = 'exam_portal';
+let db;
 
-db.connect(err => {
-  if (err) {
-    console.error('❌ MySQL Connection Error:', err);
+// Connect to MongoDB
+MongoClient.connect(MONGODB_URI, { useUnifiedTopology: true })
+  .then(client => {
+    console.log('✅ Connected to MongoDB Database.');
+    db = client.db(DATABASE_NAME);
+  })
+  .catch(err => {
+    console.error('❌ MongoDB Connection Error:', err);
     process.exit(1);
-  }
-  console.log('✅ Connected to MySQL Database.');
-});
+  });
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -32,17 +32,17 @@ app.get('/', (req, res) => {
 });
 
 // Login Handler
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { email, password, role } = req.body;
   if (!email || !password || !role) {
     return res.status(400).send('<h3>❌ Missing login credentials.</h3>');
   }
-  const sql = 'SELECT * FROM users WHERE email = ? AND role = ?';
-  db.query(sql, [email, role], (err, results) => {
-    if (err) return res.status(500).send('Server error');
-    if (results.length > 0 && results[0].password === password) {
-      const user = results[0];
-      console.log(`✅ ${user.name} (${user.email}) logged in as ${user.role}`);
+  
+  try {
+    const user = await db.collection('users').findOne({ email, role });
+    
+    if (user && user.password === password) {
+      console.log(✅ ${user.name} (${user.email}) logged in as ${user.role});
       return res.send(`
         <script>
           sessionStorage.setItem('name', '${user.name}');
@@ -53,7 +53,10 @@ app.post('/login', (req, res) => {
       `);
     }
     return res.send('<h3>❌ Incorrect email, password, or role.</h3>');
-  });
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.status(500).send('Server error');
+  }
 });
 
 // Dashboard
@@ -67,18 +70,38 @@ app.get('/instruction.html', (req, res) => {
 });
 
 // Exam Access Validation Middleware
-function validateExamAccess(req, res, next) {
+async function validateExamAccess(req, res, next) {
   const email = req.query.email;
   const examType = req.query.exam;
+  
   if (!email || !examType) {
     return res.status(403).send('<h3>❌ Missing exam type or email. Start the exam from the instruction page.</h3>');
   }
-  const sql = 'SELECT * FROM exam_sessions WHERE user_id = (SELECT id FROM users WHERE email = ?) AND exam_type = ? AND status = "started" AND camera_active = TRUE';
-  db.query(sql, [email, examType], (err, results) => {
-    if (err) return res.status(500).send('<h3>❌ Server error. Please try again.</h3>');
-    if (results.length === 0) return res.status(403).send('<h3>❌ No active session. Start the exam from the instruction page with camera enabled.</h3>');
+  
+  try {
+    // First get the user
+    const user = await db.collection('users').findOne({ email });
+    if (!user) {
+      return res.status(403).send('<h3>❌ User not found.</h3>');
+    }
+    
+    // Check for active exam session
+    const session = await db.collection('exam_sessions').findOne({
+      user_id: user._id,
+      exam_type: examType,
+      status: "started",
+      camera_active: true
+    });
+    
+    if (!session) {
+      return res.status(403).send('<h3>❌ No active session. Start the exam from the instruction page with camera enabled.</h3>');
+    }
+    
     next();
-  });
+  } catch (err) {
+    console.error('Exam access validation error:', err);
+    return res.status(500).send('<h3>❌ Server error. Please try again.</h3>');
+  }
 }
 
 // Exam Pages
@@ -91,94 +114,143 @@ app.get('/vlm_exam.html', validateExamAccess, (req, res) => {
 });
 
 // Start Exam API
-app.post('/api/start-exam', (req, res) => {
+app.post('/api/start-exam', async (req, res) => {
   const { email, examType } = req.body;
   if (!email || !examType) {
     return res.status(400).json({ error: 'Missing email or exam type' });
   }
-  const sql = 'INSERT INTO exam_sessions (user_id, exam_type, status, camera_active, started_at) VALUES ((SELECT id FROM users WHERE email = ?), ?, "started", TRUE, NOW())';
-  db.query(sql, [email, examType], (err) => {
-    if (err) return res.status(500).json({ error: 'Failed to start exam', details: err.message });
-    console.log(`📌 Exam session started: ${email} for ${examType}`);
+  
+  try {
+    // Get user first
+    const user = await db.collection('users').findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Insert exam session
+    const examSession = {
+      user_id: user._id,
+      exam_type: examType,
+      status: "started",
+      camera_active: true,
+      started_at: new Date()
+    };
+    
+    await db.collection('exam_sessions').insertOne(examSession);
+    
+    console.log(📌 Exam session started: ${email} for ${examType});
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error('Start exam error:', err);
+    return res.status(500).json({ error: 'Failed to start exam', details: err.message });
+  }
 });
 
 // Submit Answers API
-app.post('/api/submit-answers', (req, res) => {
+app.post('/api/submit-answers', async (req, res) => {
   const { email, examType, answers } = req.body;
-  if (!email || !examType || !Array.isArray(answers) || answers.length === 0 || !answers.every(a => a.questionId && a.selectedOption)) {
+  
+  if (!email || !examType || !Array.isArray(answers) || answers.length === 0 || 
+      !answers.every(a => a.questionId && a.selectedOption)) {
     return res.status(400).json({ error: 'Invalid submission data' });
   }
 
-  const insertResponses = 'INSERT INTO responses (email, exam_type, question_id, selected_option) VALUES ?';
-  const responseValues = answers.map(a => [email, examType, parseInt(a.questionId), a.selectedOption]);
+  try {
+    // Prepare response documents
+    const responseDocuments = answers.map(a => ({
+      email,
+      exam_type: examType,
+      question_id: a.questionId,
+      selected_option: a.selectedOption,
+      submitted_at: new Date()
+    }));
 
-  db.query(insertResponses, [responseValues], (err) => {
-    if (err) {
-      console.error('❌ Failed to save answers:', err);
-      return res.status(500).json({ error: 'Failed to save answers', details: err.message });
-    }
+    // Insert all responses
+    await db.collection('responses').insertMany(responseDocuments);
 
-    const questionIds = answers.map(a => parseInt(a.questionId));
-    const fetchCorrectSQL = `SELECT id, correct_answer FROM questions WHERE id IN (?)`;
+    // Get question IDs for fetching correct answers
+    const questionIds = answers.map(a => a.questionId);
+    
+    // Fetch correct answers
+    const questions = await db.collection('questions').find({
+      _id: { $in: questionIds.map(id => new ObjectId(id)) }
+    }).toArray();
 
-    db.query(fetchCorrectSQL, [questionIds], (err, correctRows) => {
-      if (err) {
-        console.error('❌ Failed to fetch correct answers:', err);
-        return res.status(500).json({ error: 'Failed to fetch correct answers', details: err.message });
-      }
+    // Create a map of correct answers
+    const correctMap = {};
+    questions.forEach(q => correctMap[q._id.toString()] = q.correct_answer);
 
-      const correctMap = {};
-      correctRows.forEach(q => correctMap[q.id] = q.correct_answer);
+    let correctCount = 0;
+    console.log(📝 Answers:);
 
-      let correctCount = 0;
-      console.log(`📝 Answers:`);
-
-      answers.forEach(a => {
-        const qid = parseInt(a.questionId);
-        const selected = a.selectedOption;
-        const correct = correctMap[qid];
-        const isCorrect = selected === correct;
-        if (isCorrect) correctCount++;
-        console.log(`Q${qid} (ID: ${qid}): Selected -> ${selected}`);
-      });
-
-      const totalQuestions = answers.length;
-      const score = ((correctCount / totalQuestions) * 100).toFixed(2);
-
-      const insertResultSQL = `INSERT INTO results (email, exam_type, total_questions, correct_answers, marks_obtained) VALUES (?, ?, ?, ?, ?)`;
-      db.query(insertResultSQL, [email, examType, totalQuestions, correctCount, score], (err) => {
-        if (err) {
-          console.error('❌ Failed to save result:', err);
-          return res.status(500).json({ error: 'Failed to save result', details: err.message });
-        }
-
-        console.log(`📊 ${email} completed ${examType} | Correct: ${correctCount}/${totalQuestions} | Score: ${score}%`);
-        res.json({ success: true });
-      });
+    answers.forEach(a => {
+      const qid = a.questionId;
+      const selected = a.selectedOption;
+      const correct = correctMap[qid];
+      const isCorrect = selected === correct;
+      if (isCorrect) correctCount++;
+      console.log(Q${qid}: Selected -> ${selected});
     });
-  });
+
+    const totalQuestions = answers.length;
+    const score = ((correctCount / totalQuestions) * 100).toFixed(2);
+
+    // Insert result
+    const result = {
+      email,
+      exam_type: examType,
+      total_questions: totalQuestions,
+      correct_answers: correctCount,
+      marks_obtained: parseFloat(score),
+      submitted_at: new Date()
+    };
+
+    await db.collection('results').insertOne(result);
+
+    console.log(📊 ${email} completed ${examType} | Correct: ${correctCount}/${totalQuestions} | Score: ${score}%);
+    res.json({ success: true });
+    
+  } catch (err) {
+    console.error('Submit answers error:', err);
+    return res.status(500).json({ error: 'Failed to submit answers', details: err.message });
+  }
 });
 
 // Fetch Questions API
-app.get('/api/questions', (req, res) => {
+app.get('/api/questions', async (req, res) => {
   const examType = req.query.exam;
   if (!examType) return res.status(400).json({ error: 'Missing exam type' });
-  const sql = 'SELECT * FROM questions WHERE exam_type = ? LIMIT 5';
-  db.query(sql, [examType], (err, results) => {
-    if (err) return res.status(500).json({ error: 'Failed to fetch questions', details: err.message });
-    const parsed = results.map(q => {
-      let options = q.options;
-      try {
-        options = typeof options === 'string' ? JSON.parse(options) : options;
-      } catch (e) {
-        options = [];
+  
+  try {
+    const questions = await db.collection('questions')
+      .find({ exam_type: examType })
+      .limit(5)
+      .toArray();
+    
+    const parsed = questions.map(q => {
+      let options = q.options || [];
+      
+      // Handle options if they're stored as string
+      if (typeof options === 'string') {
+        try {
+          options = JSON.parse(options);
+        } catch (e) {
+          options = [];
+        }
       }
-      return { id: q.id, text: q.text, options };
+      
+      return { 
+        id: q._id.toString(), 
+        text: q.text, 
+        options 
+      };
     });
+    
     res.json(parsed);
-  });
+  } catch (err) {
+    console.error('Fetch questions error:', err);
+    return res.status(500).json({ error: 'Failed to fetch questions', details: err.message });
+  }
 });
 
 // 404 Handler
@@ -188,5 +260,5 @@ app.use((req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`🚗 Server running at http://localhost:${PORT}`);
+  console.log(🚗 Server running at http://localhost:${PORT});
 });
