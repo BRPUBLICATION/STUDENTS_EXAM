@@ -42,7 +42,7 @@ app.post('/login', async (req, res) => {
     const user = await db.collection('users').findOne({ email, role });
 
     if (user && user.password === password) {
-      //console.log(`✅ ${user.name} (${user.email}) logged in as ${user.role}`);
+      console.log(`✅ ${user.name} (${user.email}) logged in as ${user.role}`);
       return res.send(`
         <script>
           sessionStorage.setItem('name', '${user.name}');
@@ -146,63 +146,66 @@ app.post('/api/start-exam', async (req, res) => {
 app.post('/api/submit-answers', async (req, res) => {
   const { email, examType, answers } = req.body;
 
-  if (!email || !examType || !Array.isArray(answers) || answers.length === 0 ||
-    !answers.every(a => a.questionId && a.selectedOption)) {
+  if (!email || !examType || !Array.isArray(answers) || answers.length === 0) {
     return res.status(400).json({ error: 'Invalid submission data' });
   }
 
   try {
-    const responseDocuments = answers.map(a => ({
-      email,
-      exam_type: examType,
-      question_id: a.questionId,
-      selected_option: a.selectedOption,
-      submitted_at: new Date()
-    }));
-
-    await db.collection('responses').insertMany(responseDocuments);
-
+    // Fetch all question IDs
     const questionIds = answers.map(a => new ObjectId(a.questionId));
 
-    const questions = await db.collection('questions').find({
+    // Get the full question details from DB
+    const questionsFromDb = await db.collection('questions').find({
       _id: { $in: questionIds }
     }).toArray();
 
-    const correctMap = {};
-    questions.forEach(q => {
-      correctMap[q._id.toString()] = q.correctAnswer || q.correct_answer;
+    // Create a map for fast lookup
+    const questionMap = {};
+    questionsFromDb.forEach(q => {
+      questionMap[q._id.toString()] = q;
     });
 
+    // Prepare detailed answers with correctness check
     let correctCount = 0;
-    answers.forEach(a => {
-      const qid = a.questionId;
+    const detailedAnswers = answers.map(a => {
+      const q = questionMap[a.questionId];
       const selected = a.selectedOption;
-      const correct = correctMap[qid];
-      const isCorrect = selected === correct;
-      if (isCorrect) correctCount++;
+      const correct = q.correct_option;
+
+      if (selected === correct) correctCount++;
+
+      return {
+        question_text: q.text,
+        options: q.options,
+        selected_option: selected,
+        correct_option: correct
+      };
     });
 
-    const totalQuestions = answers.length;
-    const score = ((correctCount / totalQuestions) * 100).toFixed(2);
+    const totalQuestions = detailedAnswers.length;
+    const marks = ((correctCount / totalQuestions) * 100).toFixed(2);
 
     const result = {
       email,
       exam_type: examType,
+      submitted_at: new Date(),
       total_questions: totalQuestions,
       correct_answers: correctCount,
-      marks_obtained: parseFloat(score),
-      submitted_at: new Date()
+      marks_obtained: parseFloat(marks),
+      answers: detailedAnswers
     };
 
+    // Save result to MongoDB
     await db.collection('results').insertOne(result);
 
-    //console.log(`📊 ${email} completed ${examType} | Correct: ${correctCount}/${totalQuestions} | Score: ${score}%`);
+    //console.log(`✅ Result stored for ${email} | Score: ${marks}%`);
     res.json({ success: true });
   } catch (err) {
-    console.error('Submit answers error:', err);
-    return res.status(500).json({ error: 'Failed to submit answers', details: err.message });
+    //console.error('❌ Error submitting answers:', err);
+    res.status(500).json({ error: 'Failed to submit answers' });
   }
 });
+
 
 // Fetch Questions API
 app.get('/api/questions', async (req, res) => {
@@ -220,10 +223,10 @@ app.get('/api/questions', async (req, res) => {
       options: Object.entries(q.options || {}).map(([key, val]) => `${key}. ${val}`)
     }));
 
-    console.log(`✅ Loaded ${parsed.length} questions for ${examType}`);
+    //console.log(`✅ Loaded ${parsed.length} questions for ${examType}`);
     res.json(parsed);
   } catch (err) {
-    console.error('❌ Fetch questions error:', err.message);
+    //console.error('❌ Fetch questions error:', err.message);
     res.status(500).json({ error: 'Failed to fetch questions', details: err.message });
   }
 });
