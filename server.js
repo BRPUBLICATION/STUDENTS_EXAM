@@ -189,7 +189,7 @@ app.post('/api/submit-answers', async (req, res) => {
       const correct = correctMap[qid];
       const isCorrect = selected === correct;
       if (isCorrect) correctCount++;
-      console.log(Q${qid}: Selected -> ${selected});
+      //console.log(Q${qid}: Selected -> ${selected});
     });
 
     const totalQuestions = answers.length;
