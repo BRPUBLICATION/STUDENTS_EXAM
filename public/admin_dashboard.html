@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard | Exam Portal</title>
+  <style>
+    :root {
+      --primary: #4285f4;
+      --secondary: #34a853;
+      --bg: #f5f7fa;
+      --card-bg: #ffffff;
+      --text: #202124;
+      --border: #dadce0;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Roboto", "Arial", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background-color: var(--card-bg);
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    header h1 {
+      margin: 0;
+      color: var(--primary);
+      font-size: 1.8rem;
+      font-weight: 500;
+    }
+
+    header p {
+      margin: 0.5rem 0 0;
+      color: #5f6368;
+      font-size: 0.9rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      padding: 2rem;
+    }
+
+    .stat-card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-card span {
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--primary);
+    }
+
+    .stat-card p {
+      margin: 0.5rem 0 0;
+      color: #5f6368;
+      font-size: 0.9rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 1px;
+      background-color: var(--border);
+      margin: 0 2rem;
+      border-radius: 5px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 1rem;
+      text-align: center;
+      background-color: var(--card-bg);
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .tab:hover, .tab.active {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .content {
+      padding: 2rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .form-section {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      padding: 2rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #202124;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+    }
+
+    .form-group textarea {
+      min-height: 100px;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--secondary);
+    }
+
+    #student-form, #question-form, #results-form, #stats-form {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Admin Dashboard</h1>
+    <p>Create tests, manage students, and monitor progress</p>
+  </header>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span>1500</span>
+      <p>Total Students</p>
+    </div>
+    <div class="stat-card">
+      <span>834</span>
+      <p>VLE Appeared</p>
+    </div>
+    <div class="stat-card">
+      <span>723</span>
+      <p>VLM Appeared</p>
+    </div>
+    <div class="stat-card">
+      <span>51.9%</span>
+      <p>Participation</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('test')">Make New Test</div>
+    <div class="tab" onclick="showTab('student')">Student Management</div>
+    <div class="tab" onclick="showTab('results')">Results Management</div>
+    <div class="tab" onclick="showTab('stats')">Exam Statistics</div>
+  </div>
+
+  <div class="content">
+    <div id="test-form" class="form-section">
+      <h2>Make New Test</h2>
+      <form action="/create-test" method="POST">
+        <div class="form-group">
+          <label for="testName">Test Name</label>
+          <input type="text" name="testName" id="testName" placeholder="Enter test name" required />
+        </div>
+        <div class="form-group">
+          <label for="examType">Exam Type</label>
+          <select name="examType" id="examType" required>
+            <option value="" disabled selected>Select exam type</option>
+            <option value="VLE">VLE</option>
+            <option value="VLM">VLM</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="emailIds">Email IDs (comma-separated)</label>
+          <input type="text" name="emailIds" id="emailIds" placeholder="e.g., student1@example.com, student2@example.com" required />
+        </div>
+        <div class="form-group">
+          <button type="submit" class="btn">Create Test</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="student-form" class="form-section">
+      <h2>Add Student Credential</h2>
+      <form action="/add-student" method="POST">
+        <div class="form-group">
+          <label for="studentEmail">Email</label>
+          <input type="email" name="email" id="studentEmail" placeholder="Enter student email" required />
+        </div>
+        <div class="form-group">
+          <label for="studentPassword">Password</label>
+          <input type="password" name="password" id="studentPassword" placeholder="Enter password" required />
+        </div>
+        <div class="form-group">
+          <button type="submit" class="btn">Add Student</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="results-form" class="form-section" style="display: none;">
+      <h2>Results Management</h2>
+      <p>Manage and publish exam results here. (To be implemented)</p>
+    </div>
+
+    <div id="stats-form" class="form-section" style="display: none;">
+      <h2>Exam Statistics</h2>
+      <p>View detailed exam statistics here. (To be implemented)</p>
+    </div>
+  </div>
+
+  <script>
+    function showTab(tabName) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
+      document.querySelectorAll('.content > .form-section').forEach(form => form.style.display = 'none');
+      document.getElementById(`${tabName}-form`).style.display = 'block';
+    }
+
+    // Initialize tab
+    document.addEventListener('DOMContentLoaded', () => {
+      showTab('test');
+    });
+  </script>
+</body>
+</html>

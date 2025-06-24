@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exam Portal | Dashboard</title>
+  <style>
+    :root {
+      --primary: #0d47a1;
+      --accent: #1976d2;
+      --bg: #f5f7fa;
+      --card-bg: #ffffff;
+      --text: #212121;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      margin: 0;
+      padding: 2rem;
+      color: var(--text);
+    }
+    h2 {
+      color: var(--primary);
+      text-align: center;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: var(--card-bg);
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .exam-card {
+      background: var(--bg);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .exam-card a {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 10px 20px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .exam-card a:hover {
+      background: var(--accent);
+    }
+    #logout {
+      display: block;
+      margin: 2rem auto;
+      padding: 10px 20px;
+      background: #d32f2f;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Welcome to Your Dashboard, <span id="user-name">User</span></h2>
+    <div class="exam-card">
+      <h3>Village Level Exam (VLE)</h3>
+      <p>Test your knowledge for village-level responsibilities.</p>
+      <a href="/instruction.html?exam=VLE">Join VLE Exam</a>
+    </div>
+    <div class="exam-card">
+      <h3>Village Level Monitoring Exam (VLM)</h3>
+      <p>Assess your monitoring skills for village activities.</p>
+      <a href="/instruction.html?exam=VLM">Join VLM Exam</a>
+    </div>
+    <button id="logout">Logout</button>
+  </div>
+  <script>
+    const userName = sessionStorage.getItem('name');
+    const role = sessionStorage.getItem('role');
+    if (!userName || !role) {
+      window.location.href = '/';
+    } else {
+      document.getElementById('user-name').textContent = userName;
+    }
+    document.getElementById('logout').onclick = () => {
+      sessionStorage.clear();
+      window.location.href = '/';
+    };
+  </script>
+</body>
+</html>

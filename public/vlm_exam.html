@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Village Level Exam | Proctoring Mode</title>
+  <style>
+    :root {
+      --primary: #0d47a1;
+      --accent: #1976d2;
+      --bg: #f5f7fa;
+      --card-bg: #ffffff;
+      --text: #212121;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .video-container {
+      width: 30%;
+      padding: 1rem;
+      background: var(--card-bg);
+      border-right: 2px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .video-container h3 {
+      color: var(--primary);
+    }
+    #video {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+      border: 3px solid var(--primary);
+      background: #000;
+    }
+    .warning {
+      color: red;
+      font-weight: bold;
+      margin-top: 1rem;
+      display: none;
+    }
+    .exam-container {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+    h2 {
+      color: var(--primary);
+      text-align: center;
+    }
+    .question-block {
+      margin-bottom: 2rem;
+      background: var(--card-bg);
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .question-text {
+      font-weight: bold;
+    }
+    .option {
+      display: block;
+      margin: 0.5rem 0;
+    }
+    #submit-btn {
+      display: none;
+      margin: 2rem auto 0;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #submit-btn:hover {
+      background-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="video-container">
+    <h3>🔴 Live Proctoring</h3>
+    <video id="video" autoplay muted></video>
+    <div class="warning" id="warning">⚠️ Camera not working or blocked!</div>
+  </div>
+  <div class="exam-container">
+    <h2>Village Level Exam - Questions</h2>
+    <div id="question-container">
+      <p>Loading questions...</p>
+    </div>
+    <button id="submit-btn">Submit Exam</button>
+  </div>
+  <script>
+    const video = document.getElementById('video');
+    const warning = document.getElementById('warning');
+    const submitBtn = document.getElementById('submit-btn');
+    const questionContainer = document.getElementById('question-container');
+    // Get exam type and email from URL query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const examType = urlParams.get('exam') || 'VLM';
+    const email = urlParams.get('email');
+    document.title = `${examType} Exam | Proctoring Mode`;
+    document.querySelector('h2').textContent = `${examType} Exam - Questions`;
+    let stream;
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        checkVideoBrightness();
+        loadQuestions();
+      } catch (err) {
+        console.warn('Webcam access denied or unavailable:', err);
+        warning.style.display = 'block';
+        questionContainer.innerHTML = '<p style="color:red">Camera not allowed. Exam cannot be started.</p>';
+      }
+    }
+    function checkVideoBrightness() {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 320;
+      canvas.height = 240;
+      setInterval(() => {
+        try {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+          let totalBrightness = 0;
+          for (let i = 0; i < frame.data.length; i += 4) {
+            totalBrightness += frame.data[i] + frame.data[i + 1] + frame.data[i + 2];
+          }
+          const avgBrightness = totalBrightness / (frame.data.length / 4);
+          if (avgBrightness < 25) {
+            warning.innerText = '⚠️ Camera covered or blocked. Returning to dashboard...';
+            warning.style.display = 'block';
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 3000);
+          } else {
+            warning.style.display = 'none';
+          }
+        } catch (e) {
+          warning.innerText = '⚠️ Camera feed interrupted. Returning to dashboard...';
+          warning.style.display = 'block';
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 3000);
+        }
+      }, 2000);
+    }
+    function loadQuestions() {
+      fetch(`/api/questions?exam=${examType}`)
+        .then(res => res.json())
+        .then(questions => {
+          questionContainer.innerHTML = '';
+          if (!questions || !Array.isArray(questions) || questions.length === 0) {
+            questionContainer.innerHTML = `<p style="color:red">❌ No questions available for ${examType} exam.</p>`;
+            return;
+          }
+          questions.forEach((q, i) => {
+            const block = document.createElement('div');
+            block.className = 'question-block';
+            const qText = document.createElement('p');
+            qText.className = 'question-text';
+            qText.textContent = `Q${i + 1}. ${q.text}`;
+            block.appendChild(qText);
+            const options = Array.isArray(q.options) ? q.options : JSON.parse(q.options);
+            options.forEach(opt => {
+              const label = document.createElement('label');
+              label.className = 'option';
+              label.innerHTML = `<input type="radio" name="q${q.id}" value="${opt}"> ${opt}`;
+              block.appendChild(label);
+            });
+            questionContainer.appendChild(block);
+          });
+          submitBtn.style.display = 'block';
+          submitBtn.onclick = () => {
+            const unanswered = [];
+            questions.forEach((q, i) => {
+              if (!document.querySelector(`input[name="q${q.id}"]:checked`)) {
+                unanswered.push(i + 1);
+              }
+            });
+            if (unanswered.length > 0) {
+              alert(`❌ Please answer all questions. Unanswered: Q${unanswered.join(', Q')}`);
+              return;
+            }
+            const answers = questions.map(q => ({
+              questionId: q.id,
+              selectedOption: document.querySelector(`input[name="q${q.id}"]:checked`).value
+            }));
+            fetch('/api/submit-answers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, examType, answers })
+            })
+              .then(res => res.json())
+              .then(data => {
+                if (data.success) {
+                  alert('📝 Answers submitted. Thank you!');
+                  window.location.href = '/dashboard';
+                } else {
+                  alert('❌ Failed to submit answers. Please try again.');
+                }
+              })
+              .catch(err => {
+                console.error('❌ Error submitting answers:', err);
+                alert('❌ Failed to submit answers. Please try again.');
+              });
+          };
+        })
+        .catch(err => {
+          console.error('❌ Error loading questions:', err);
+          questionContainer.innerHTML = `<p style="color:red">❌ Failed to load questions for ${examType} exam.</p>`;
+        });
+    }
+    startCamera();
+  </script>
+</body>
+</html>
