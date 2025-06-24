@@ -7,7 +7,7 @@ const PORT = 3000;
 
 // MySQL Connection
 const db = mysql.createConnection({
-  host: '127.0.0.1',
+  host: '100.20.92.101',
   user: 'root',
   password: 'Krish@2005', // Use environment variables in production
   database: 'exam_portal',
