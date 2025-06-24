@@ -181,7 +181,7 @@ app.post('/api/submit-answers', async (req, res) => {
     questions.forEach(q => correctMap[q._id.toString()] = q.correct_answer);
 
     let correctCount = 0;
-    console.log(📝 Answers:);
+    //console.log(📝 Answers:);
 
     answers.forEach(a => {
       const qid = a.questionId;
