@@ -138,7 +138,7 @@ app.post('/api/start-exam', async (req, res) => {
     
     await db.collection('exam_sessions').insertOne(examSession);
     
-    console.log(📌 Exam session started: ${email} for ${examType});
+    //console.log(📌 Exam session started: ${email} for ${examType});
     res.json({ success: true });
   } catch (err) {
     console.error('Start exam error:', err);
@@ -207,7 +207,7 @@ app.post('/api/submit-answers', async (req, res) => {
 
     await db.collection('results').insertOne(result);
 
-    console.log(📊 ${email} completed ${examType} | Correct: ${correctCount}/${totalQuestions} | Score: ${score}%);
+    //console.log(📊 ${email} completed ${examType} | Correct: ${correctCount}/${totalQuestions} | Score: ${score}%);
     res.json({ success: true });
     
   } catch (err) {
