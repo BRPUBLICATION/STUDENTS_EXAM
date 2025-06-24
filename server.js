@@ -42,7 +42,7 @@ app.post('/login', async (req, res) => {
     const user = await db.collection('users').findOne({ email, role });
     
     if (user && user.password === password) {
-      console.log(✅ ${user.name} (${user.email}) logged in as ${user.role});
+      //console.log(✅ ${user.name} (${user.email}) logged in as ${user.role});
       return res.send(`
         <script>
           sessionStorage.setItem('name', '${user.name}');
