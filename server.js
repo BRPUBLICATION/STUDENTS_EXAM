@@ -129,15 +129,18 @@ app.post('/api/submit-answers', async (req, res) => {
     }).toArray();
 
     const questionMap = {};
-    questionsFromDb.forEach(q => { questionMap[q._id.toString()] = q; });
+    questionsFromDb.forEach(q => {
+      questionMap[q._id.toString()] = q;
+    });
 
     let correctCount = 0;
     const detailedAnswers = answers.map(a => {
       const q = questionMap[a.questionId];
       const selected = a.selectedOption;
-      const correct = q.correct_option;
+      const correct = q.correct_option?.toString().trim();
 
-      if (selected === correct) correctCount++;
+      const isCorrect = selected && selected.startsWith(correct);
+      if (isCorrect) correctCount++;
 
       return {
         question_id: a.questionId,
