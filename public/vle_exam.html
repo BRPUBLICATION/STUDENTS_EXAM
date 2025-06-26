@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VLE Exam | Proctoring Mode</title>
+  <title>VLM Exam | Proctoring Mode</title>
   <style>
     :root {
       --primary: #0d47a1;
@@ -94,7 +94,7 @@
   </div>
 
   <div class="exam-container">
-    <h2>VLE Exam - Questions <span id="timer"></span></h2>
+    <h2>VLM Exam - Questions <span id="timer"></span></h2>
     <div id="question-container">
       <p>Loading questions...</p>
     </div>
@@ -108,7 +108,7 @@
     const questionContainer = document.getElementById('question-container');
     const timerDisplay = document.getElementById('timer');
     const urlParams = new URLSearchParams(window.location.search);
-    const examType = urlParams.get('exam') || 'VLE';
+    const examType = urlParams.get('exam') || 'VLM';
     const email = urlParams.get('email');
     let stream, questions = [], timerInterval;
 
