@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Village Level Exam | Proctoring Mode</title>
+  <title>VLE Exam | Proctoring Mode</title>
   <style>
     :root {
       --primary: #0d47a1;
@@ -12,9 +12,7 @@
       --card-bg: #ffffff;
       --text: #212121;
     }
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
       margin: 0;
@@ -33,12 +31,9 @@
       align-items: center;
       justify-content: center;
     }
-    .video-container h3 {
-      color: var(--primary);
-    }
+    .video-container h3 { color: var(--primary); }
     #video {
       width: 100%;
-      height: auto;
       border-radius: 10px;
       border: 3px solid var(--primary);
       background: #000;
@@ -58,6 +53,11 @@
       color: var(--primary);
       text-align: center;
     }
+    #timer {
+      float: right;
+      color: red;
+      font-size: 18px;
+    }
     .question-block {
       margin-bottom: 2rem;
       background: var(--card-bg);
@@ -65,9 +65,7 @@
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
-    .question-text {
-      font-weight: bold;
-    }
+    .question-text { font-weight: bold; }
     .option {
       display: block;
       margin: 0.5rem 0;
@@ -94,135 +92,153 @@
     <video id="video" autoplay muted></video>
     <div class="warning" id="warning">⚠️ Camera not working or blocked!</div>
   </div>
+
   <div class="exam-container">
-    <h2>Village Level Exam - Questions</h2>
+    <h2>VLE Exam - Questions <span id="timer"></span></h2>
     <div id="question-container">
       <p>Loading questions...</p>
     </div>
     <button id="submit-btn">Submit Exam</button>
   </div>
+
   <script>
     const video = document.getElementById('video');
     const warning = document.getElementById('warning');
     const submitBtn = document.getElementById('submit-btn');
     const questionContainer = document.getElementById('question-container');
-    // Get exam type and email from URL query parameters
+    const timerDisplay = document.getElementById('timer');
     const urlParams = new URLSearchParams(window.location.search);
     const examType = urlParams.get('exam') || 'VLE';
     const email = urlParams.get('email');
+    let stream, questions = [], timerInterval;
+
     document.title = `${examType} Exam | Proctoring Mode`;
-    document.querySelector('h2').textContent = `${examType} Exam - Questions`;
-    let stream;
+
+    // Prevent accidental reload/exit
+    function handleBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '⚠️ Are you sure you want to leave? Please submit the exam first.';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    window.addEventListener('popstate', () => {
+      alert('Navigation not allowed. Please submit the exam first.');
+    });
+
+    async function enterFullScreen() {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        try { await el.requestFullscreen(); } catch (err) {}
+      }
+    }
+
     async function startCamera() {
+      await enterFullScreen();
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
         checkVideoBrightness();
         loadQuestions();
+        startTimer();
       } catch (err) {
-        console.warn('Webcam access denied or unavailable:', err);
         warning.style.display = 'block';
-        questionContainer.innerHTML = '<p style="color:red">Camera not allowed. Exam cannot be started.</p>';
+        questionContainer.innerHTML = '<p style="color:red">Camera not allowed. Exam cannot start.</p>';
       }
     }
+
     function checkVideoBrightness() {
       const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.width = 320;
-      canvas.height = 240;
+      const ctx = canvas.getContext('2d');
+      canvas.width = 320; canvas.height = 240;
       setInterval(() => {
         try {
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const frame = context.getImageData(0, 0, canvas.width, canvas.height);
-          let totalBrightness = 0;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          let brightness = 0;
           for (let i = 0; i < frame.data.length; i += 4) {
-            totalBrightness += frame.data[i] + frame.data[i + 1] + frame.data[i + 2];
+            brightness += frame.data[i] + frame.data[i+1] + frame.data[i+2];
           }
-          const avgBrightness = totalBrightness / (frame.data.length / 4);
-          if (avgBrightness < 25) {
-            warning.innerText = '⚠️ Camera covered or blocked. Returning to dashboard...';
+          const avg = brightness / (frame.data.length / 4);
+          if (avg < 25) {
+            warning.innerText = '⚠️ Camera blocked. Submitting exam...';
             warning.style.display = 'block';
-            setTimeout(() => {
-              window.location.href = '/dashboard';
-            }, 3000);
+            submitAnswers();
           } else {
             warning.style.display = 'none';
           }
         } catch (e) {
-          warning.innerText = '⚠️ Camera feed interrupted. Returning to dashboard...';
+          warning.innerText = '⚠️ Camera error. Submitting exam...';
           warning.style.display = 'block';
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 3000);
+          submitAnswers();
         }
       }, 2000);
     }
+
     function loadQuestions() {
       fetch(`/api/questions?exam=${examType}`)
         .then(res => res.json())
-        .then(questions => {
+        .then(data => {
+          questions = data;
+          sessionStorage.setItem('downloadedQuestions', JSON.stringify(data));
           questionContainer.innerHTML = '';
-          if (!questions || !Array.isArray(questions) || questions.length === 0) {
-            questionContainer.innerHTML = `<p style="color:red">❌ No questions available for ${examType} exam.</p>`;
-            return;
-          }
+          if (!questions.length) return questionContainer.innerHTML = '<p>No questions found.</p>';
           questions.forEach((q, i) => {
             const block = document.createElement('div');
             block.className = 'question-block';
-            const qText = document.createElement('p');
-            qText.className = 'question-text';
-            qText.textContent = `Q${i + 1}. ${q.text}`;
-            block.appendChild(qText);
-            const options = Array.isArray(q.options) ? q.options : JSON.parse(q.options);
-            options.forEach(opt => {
-              const label = document.createElement('label');
-              label.className = 'option';
-              label.innerHTML = `<input type="radio" name="q${q.id}" value="${opt}"> ${opt}`;
-              block.appendChild(label);
+            block.innerHTML = `<p class='question-text'>Q${i+1}. ${q.text}</p>`;
+            q.options.forEach(opt => {
+              block.innerHTML += `<label class='option'><input type='radio' name='q${q.id}' value='${opt}'> ${opt}</label>`;
             });
             questionContainer.appendChild(block);
           });
           submitBtn.style.display = 'block';
-          submitBtn.onclick = () => {
-            const unanswered = [];
-            questions.forEach((q, i) => {
-              if (!document.querySelector(`input[name="q${q.id}"]:checked`)) {
-                unanswered.push(i + 1);
-              }
-            });
-            if (unanswered.length > 0) {
-              alert(`❌ Please answer all questions. Unanswered: Q${unanswered.join(', Q')}`);
-              return;
-            }
-            const answers = questions.map(q => ({
-              questionId: q.id,
-              selectedOption: document.querySelector(`input[name="q${q.id}"]:checked`).value
-            }));
-            fetch('/api/submit-answers', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, examType, answers })
-            })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  alert('📝 Answers submitted. Thank you!');
-                  window.location.href = '/dashboard';
-                } else {
-                  alert('❌ Failed to submit answers. Please try again.');
-                }
-              })
-              .catch(err => {
-                console.error('❌ Error submitting answers:', err);
-                alert('❌ Failed to submit answers. Please try again.');
-              });
-          };
-        })
-        .catch(err => {
-          console.error('❌ Error loading questions:', err);
-          questionContainer.innerHTML = `<p style="color:red">❌ Failed to load questions for ${examType} exam.</p>`;
+          submitBtn.onclick = submitAnswers;
         });
     }
+
+    function submitAnswers() {
+      clearInterval(timerInterval);
+      window.removeEventListener('beforeunload', handleBeforeUnload); // ✅ remove warning
+
+      const answers = questions.map(q => {
+        const selected = document.querySelector(`input[name="q${q.id}"]:checked`);
+        return {
+          questionId: q.id,
+          selectedOption: selected ? selected.value : null
+        };
+      });
+
+      fetch('/api/submit-answers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, examType, answers })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          sessionStorage.clear();
+          alert('✅ Exam submitted. You are now logged out.');
+          window.location.href = '/';
+        } else {
+          alert('❌ Submission failed. Try again.');
+        }
+      })
+      .catch(() => alert('❌ Network error. Try again.'));
+    }
+
+    function startTimer() {
+      let time = 100 * 60;
+      timerInterval = setInterval(() => {
+        const m = Math.floor(time / 60), s = time % 60;
+        timerDisplay.textContent = `Time Left: ${m}:${s < 10 ? '0' : ''}${s}`;
+        if (--time < 0) {
+          clearInterval(timerInterval);
+          alert('⏰ Time is up. Auto-submitting.');
+          submitAnswers();
+        }
+      }, 1000);
+    }
+
     startCamera();
   </script>
 </body>
