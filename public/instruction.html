@@ -30,6 +30,8 @@
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       margin-top: 1rem;
+      font-size: 16px;
+      line-height: 1.6;
     }
     button {
       display: block;
@@ -80,14 +82,18 @@
   <video id="video" autoplay muted></video>
   <div class="warning" id="warning">⚠️ Camera access is mandatory. Please allow camera access and ensure it is not blocked.</div>
   <div class="instructions">
-    <p>Please enable your camera to proceed. If you see your video feed above, click "Start Exam".</p>
+    <p>🎥 <strong>Camera access is required</strong> to start the exam. If you see your video feed above, click "Start Exam".</p>
   </div>
+
   <ul>
-    <li>Keep your webcam open during the exam.</li>
-    <li>Do not switch tabs or minimize the browser.</li>
-    <li>Ensure you are in a well-lit room.</li>
-    <li>Once you start, the exam cannot be paused.</li>
+    <li>📸 <strong>Camera must remain active</strong> throughout the exam. If the camera is blocked or closed, you will be redirected.</li>
+    <li>🧠 Attempt as many questions as you can. Only the answered questions will be submitted.</li>
+    <li>⏰ The exam has a <strong>100-minute timer</strong>. After that, it will auto-submit whatever is completed.</li>
+    <li>🚫 Do not switch tabs, refresh the page, or minimize the browser window.</li>
+    <li>💡 Ensure you're in a quiet, well-lit environment with minimal distractions.</li>
+    <li>🔒 Once started, the exam cannot be paused or restarted.</li>
   </ul>
+
   <button id="startExamBtn" disabled>Start Exam</button>
 
   <script>
@@ -99,7 +105,6 @@
     const examType = urlParams.get('exam') || 'VLE';
     const email = sessionStorage.getItem('email');
 
-    // Set dynamic heading and title
     document.title = `${examType} Exam - Instructions`;
     document.getElementById('exam-title').textContent = `${examType} Exam - Instructions`;
 
@@ -133,13 +138,24 @@
       }, 1000);
     }
 
-    startBtn.addEventListener('click', () => {
+    startBtn.addEventListener('click', async () => {
       if (!email) {
         alert('❌ Email not found. Please log in again.');
         window.location.href = '/';
         return;
       }
 
+      // Try to enter fullscreen mode
+      const docElm = document.documentElement;
+      if (docElm.requestFullscreen) {
+        try {
+          await docElm.requestFullscreen();
+        } catch (err) {
+          console.warn('Fullscreen request failed:', err);
+        }
+      }
+
+      // Start the exam session
       fetch('/api/start-exam', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
